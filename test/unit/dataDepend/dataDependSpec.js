@@ -162,13 +162,36 @@ describe('dataDepend', function() {
 
   describe('data', function() {
 
-    it('should resolve data using promise', inject(function($rootScope, dataFactory) {
+    var __dataFactory;
 
-      var dataDepend = { providers: {} };
+    beforeEach(inject(function(dataFactory) {
+      __dataFactory = dataFactory;
+    }));
 
-      var data = dataFactory.create({ 
+    function createProviderFactory(dataDepend) {
+
+      if (!dataDepend) {
+        dataDepend = { providers: {} };
+      }
+
+      return function createProvider(options) {
+
+        options = angular.extend(options, { registry: dataDepend });
+
+        var provider = __dataFactory.create(options);
+
+        dataDepend.providers[options.name] = provider;
+
+        return provider;
+      };
+    }
+
+    it('should resolve data using promise', inject(function($rootScope) {
+
+      var createProvider = createProviderFactory();
+
+      var provider = createProvider({
         name: 'foo', 
-        registry: dataDepend,
         factory: function() {
           return 'FOO';
         }
@@ -177,7 +200,7 @@ describe('dataDepend', function() {
       var value;
 
       // when
-      var getter = data.get();
+      var getter = provider.resolve();
 
       // then
       expect(getter.then).toBeDefined();
@@ -194,101 +217,175 @@ describe('dataDepend', function() {
 
     it('should resolve dependent data', inject(function($rootScope, dataFactory) {
 
-      var dataDepend = { providers: {} };
+      var createProvider = createProviderFactory();
 
-      var dataFoo = dataFactory.create({ 
+      var fooProvider = createProvider({
         name: 'foo', 
-        registry: dataDepend,
         factory: function() {
           return 'FOO';
         }
       });
 
-      dataDepend.providers['foo'] = dataFoo;
-
-      var dataBar = dataFactory.create({ 
+      var barProvider = createProvider({ 
         name: 'bar', 
-        registry: dataDepend,
         dependencies: ['foo'],
         factory: function(foo) {
           return foo;
         }
       });
 
-      var barValue;
-
       // when
-      var barGetter = dataBar.get();
+      barProvider.resolve();
 
-      barGetter.then(function(v) {
-        barValue = v;
-      });
-
-      // trigger value change
       $rootScope.$digest();
 
-      expect(barValue).toBe('FOO');
+      // then
+      expect(barProvider.get()).toBe('FOO');
     }));
 
-    it('should resolve dependent data', inject(function($rootScope, dataFactory) {
+    it('should update dependent data on #set', inject(function($rootScope, dataFactory) {
 
-      var dataDepend = { providers: {} };
+      var createProvider = createProviderFactory();
 
-      var producedLevel0A = 'A';
-      var producedLevel0B = 'B';
-
-      var dataLevel0A = createData('level0A', [], false, function () {
-        return producedLevel0A;        
+      var fooProvider = createProvider({
+        name: 'foo', 
+        value: 'FOO'
       });
 
-      var dataLevel0B = createData('level0B', [], false, function () {
-        return producedLevel0B;
+      var barProvider = createProvider({ 
+        name: 'bar', 
+        dependencies: ['foo'],
+        factory: function(foo) {
+          return foo;
+        }
       });
 
-      var dataLevel1 = createData('level1', [ 'level0A', 'level0B' ], false, function (level0A, level0B) {
-        return level0A + '-' + level0B;
+      // when
+      barProvider.resolve();
+      $rootScope.$digest();
+
+
+      fooProvider.set('BAR');
+      barProvider.resolve();
+      $rootScope.$digest();
+
+      expect(barProvider.get()).toBe('BAR');
+    }));
+
+    it('should handle nested dependent data changes (X)', inject(function($rootScope) {
+
+      var createProvider = createProviderFactory();
+
+      var a1Provider = createProvider({
+        name: 'a1', 
+        value: 'A1'
       });
 
-      var dataLevel2A = createData('level2A', [ 'level1' ], true, function (level1) {
-        return level1 + '-' + 'A2';
+      var a2Provider = createProvider({
+        name: 'a2', 
+        value: 'A2'
       });
 
-      var dataLevel2B = createData('level2B', [ 'level1' ], true, function (level1) {
-        return level1 + '-' + 'B2';
-      });      
+      var bProvider = createProvider({
+        name: 'b',
+        dependencies: [ 'a1', 'a2' ], 
+        factory: function (a1, a2) {
+          return a1 + '-' + a2;
+        }
+      });
 
-      function createData(name, dependencies, resolve, factory) {
-        var data = dataFactory.create({ 
-          name: name,
-          registry: dataDepend,
-          resolve: resolve,
-          dependencies: dependencies,
-          factory: factory
-        });
+      var c1Provider = createProvider({
+        name: 'c1', 
+        dependencies: [ 'b' ],
+        eager: true, 
+        factory: function (b) {
+          return b + '-' + 'C1';
+        }
+      });
 
-        dataDepend.providers[ name ] = data;
+      var c2Provider = createProvider({
+        name: 'c2', 
+        dependencies: [ 'b' ],
+        eager: true, 
+        factory: function (b) {
+          return b + '-' + 'C2';
+        }
+      });
 
-        return data;
-      }
+      // when
+      $rootScope.$digest();
+
+      // then
+      expect(bProvider.get()).toBe('A1-A2');
+
+      expect(c1Provider.get()).toBe('A1-A2-C1');
+      expect(c2Provider.get()).toBe('A1-A2-C2');
 
       // when
 
-      // trigger value change
+      a2Provider.set('XX');
+
       $rootScope.$digest();
 
-      expect(dataLevel1.value).toBe('A-B');
+      expect(bProvider.get()).toBe('A1-XX');
 
-      expect(dataLevel2A.value).toBe('A-B-A2');
-      expect(dataLevel2B.value).toBe('A-B-B2');
+      expect(c1Provider.get()).toBe('A1-XX-C1');
+      expect(c2Provider.get()).toBe('A1-XX-C2');
+    }));
 
-      /*// change result produced by foo provider
-      producedLevel0A = 'C';
-      dataFoo.get({ reload: true });
+    it('should handle nested dependent data changes (<>)', inject(function($rootScope) {
 
-      // trigger value change
+      var createProvider = createProviderFactory();
+
+      var aProvider = createProvider({
+        name: 'a', 
+        value: 'A'
+      });
+
+      var b1Provider = createProvider({
+        name: 'b1',
+        dependencies: [ 'a' ], 
+        factory: function (a) {
+          return a + '-B1';
+        }
+      });
+
+      var b2Provider = createProvider({
+        name: 'b2', 
+        dependencies: [ 'a' ],
+        factory: function (a) {
+          return a + '-B2';
+        }
+      });
+
+      var cProvider = createProvider({
+        name: 'c', 
+        dependencies: [ 'b1', 'b2' ],
+        eager: true, 
+        factory: function (b1, b2) {
+          return b1 + '-' + b2;
+        }
+      });
+
+      // when
       $rootScope.$digest();
 
-      expect(dataBar.value).toBe(producedFoo);*/
+      // then
+      expect(b1Provider.get()).toBe('A-B1');
+      expect(b2Provider.get()).toBe('A-B2');
+
+      expect(cProvider.get()).toBe('A-B1-A-B2');
+
+      // when
+
+      aProvider.set('XX');
+
+      $rootScope.$digest();
+
+      expect(b1Provider.get()).toBe('XX-B1');
+      expect(b2Provider.get()).toBe('XX-B2');
+
+      expect(cProvider.get()).toBe('XX-B1-XX-B2');
     }));
 
   });

@@ -26,28 +26,59 @@
           
           options = options || {};
 
-          var registry = options.registry,
+          var name = options.name,
+              registry = options.registry,
               dependencies = options.dependencies || [],
-              name = options.name,
               factory = options.factory, 
-              resolve = options.resolve || false;
+              eager = options.eager || false;
 
-          var loadPromise;
-
-          var provider = { },
+          var parentValues = {},
+              children = [],
               changed = true,
-              dirty = true;
+              dirty = true,
+              loading = null,
+              data = { $loaded: false };
 
-          // parent values
-          var parentValues = { };
+          // element produced by 
+          // the factory
+          var provider = {
+            name: name,
+            data: data,
+            get: get, 
+            set: set,
+            resolve: resolve,
+            children: children, 
+            parentChanged: parentChanged
+          };
 
-          var children = provider.children = [],
-              parents = { };
-
-          forEach(dependencies, function(dependency) {
-            var p = getProvider(dependency);
-            p.children.push(provider);
+          allDependenciesDo(function(d) {
+            getProvider(d).children.push(provider);
           });
+
+          if (eager) {
+            nextTick(function() {
+              resolve();
+            });
+          }
+
+          if (!factory) {
+            setLoaded(options.value);
+          }
+
+          function setLoaded(v) {
+            data.value = v;
+            data.$loaded = true;
+            changed = false;
+
+            allChildrenDo(function(child) {
+              child.parentChanged();
+            });
+          }
+
+          function setLoading() {
+            data.$loaded = false;
+            dirty = false;
+          }
 
           function getProvider(key) {
             var providers = registry.providers,
@@ -60,17 +91,21 @@
             return provider;
           }
 
-          function allChildren(fn) {
+          function allChildrenDo(fn) {
             forEach(children, fn);
+          }
+
+          function allDependenciesDo(fn) {
+            forEach(dependencies, fn);
           }
 
           function resolveDependencies() {
             var promises = [];
 
-            forEach(dependencies, function(d) {
+            allDependenciesDo(function(d) {
               var provider = getProvider(d);
 
-              var promise = provider.get().then(function(value) {
+              var promise = provider.resolve().then(function(value) {
 
                 var oldValue = parentValues[d];
                 if (oldValue != value) {
@@ -88,76 +123,87 @@
           }
 
           function asyncLoad(reload) {
-            provider.$loaded = dirty = false;
+            setLoading();
 
             var promise = $q.all(resolveDependencies()).then(function(values) {
 
+              var value = get();
+
               if (changed || reload) {
-                provider.value = factory.apply(factory, values);
+                if (factory) {
+                  value = factory.apply(factory, values);
+                }
               }
 
-              provider.$loaded = true;
-              changed = false;
+              if (loading === promise) {
+                loading = null;
+              }
 
-              loadPromise = null;
+              setLoaded(value);
 
-              allChildren(function(child) {
-                child.parentChanged();
-              });
-
-              return provider.value;
+              return value;
             });
 
             return promise;
           }
 
+          /**
+           * Receive a notification from the parent that it got changed
+           * and update your state accordingly.
+           *
+           */
           function parentChanged() {
             
             // anticipating parent change, everything ok
-            if (loadPromise) {
+            if (loading) {
               return;
             }
 
             dirty = true;
 
-            allChildren(function(child) {
+            // should this provider resolve its data 
+            // eagerly if it got dirty
+            if (eager) {
+              nextTick(function() {
+                resolve();
+              });
+            }
+
+            allChildrenDo(function(child) {
               child.parentChanged();
             });
-
-            // should this data be resolved if dirty
-            if (resolve) {
-              get();
-            }
           }
 
-          function get(options) {
+          function get() {
+            return data.value;
+          }
+
+          /**
+           * Resolve the value of this data holder
+           */
+          function resolve(options) {
             var reload = (options || {}).reload;
 
             if (dirty || reload) {
-              loadPromise = asyncLoad(reload);
+              loading = asyncLoad(reload);
             }
 
-            if (loadPromise) {
-              return loadPromise;
+            if (loading) {
+              return loading;
             } else {
-              return $q.when(provider.value);
+              return $q.when(get());
             }
           }
 
           function set(value) {
+            if (factory) {
+              throw new Error("[dataDepend] Cannot set value, was using factory");
+            }
 
+            setLoaded(value);
           }
 
-          if (resolve) {
-            get();
-          } 
-
-          // provider item produced by factory
-          return extend(provider, {
-            get: get, 
-            set: set,
-            parentChanged: parentChanged
-          });
+          return provider;
         };
 
         // factory
