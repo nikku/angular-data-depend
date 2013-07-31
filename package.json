@@ -1,0 +1,26 @@
+{
+  "name": "angular-data-depend",
+  "author": "Nico Rehwaldt <https://github.com/Nikku>",
+  "description": "A toolkit for implementing complex, data heavy applications",
+  "version": "1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Nikku/angular-data-depend.git"
+  },
+  "keywords": [
+    "angularjs",
+    "data"
+  ],
+  "scripts": {
+    "test": "grunt travis --verbose"
+  },
+  "devDependencies": {
+    "grunt": "~0.4.1",
+    "grunt-contrib-jshint": "~0.1.1",
+    "grunt-contrib-nodeunit": "~0.1.2",
+    "grunt-karma": "~0.5.0",
+    "grunt-contrib-uglify": "~0.2.2",
+    "grunt-contrib-watch": "~0.5.1"
+  },
+  "license": "MIT"
+}
