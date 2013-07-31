@@ -18,7 +18,7 @@
       }
     }
 
-    var dataFactory = [ '$rootScope', '$q', function($rootScope, $q) {
+    var dataProviderFactory = [ '$rootScope', '$q', function($rootScope, $q) {
       
       function createFactory(nextTick) {
 
@@ -135,6 +135,8 @@
                 }
               }
 
+              return value;
+            }).then(function(value) {
               if (loading === promise) {
                 loading = null;
               }
@@ -259,7 +261,7 @@
     }];
 
     module.factory('dataDependFactory', dataDependFactory);
-    module.factory('dataFactory', dataFactory);
+    module.factory('dataProviderFactory', dataProviderFactory);
 
     return module;
   }
