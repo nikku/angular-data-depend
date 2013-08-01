@@ -7,7 +7,7 @@ module.exports = function(grunt) {
     uglify: {
       main: {
         files: {
-          'build/dataDepend.min.js': [ 'src/dataDepend.js' ]
+          'dist/dataDepend.min.js': [ 'src/dataDepend.js' ]
         }
       }
     },
@@ -27,6 +27,11 @@ module.exports = function(grunt) {
         configFile: 'config/karma.unit.js',
         singleRun: true,
         browsers: [ 'PhantomJS' ]
+      },
+      singleDist: {
+        configFile: 'config/karma.unit.dist.js',
+        singleRun: true,
+        browsers: [ 'PhantomJS' ]
       }
     }
   });
@@ -37,11 +42,13 @@ module.exports = function(grunt) {
   grunt.loadNpmTasks('grunt-contrib-watch');
 
   // default task: minify sources and publish to ./build
-  grunt.registerTask( 'default', [ 'test-single' ]);
+  grunt.registerTask( 'default', [ 'dist' ]);
 
   // travis task
   grunt.registerTask('travis', [ 'default' ]);
 
   // test task
-  grunt.registerTask( 'test-single', [ 'uglify', 'karma:single' ]);
+  grunt.registerTask( 'test-single', [ 'karma:single' ]);
+
+  grunt.registerTask( 'dist', [ 'uglify', 'karma:singleDist' ]);
 };
