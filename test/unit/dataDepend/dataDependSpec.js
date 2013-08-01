@@ -30,6 +30,40 @@ describe('dataDepend', function() {
       expect(status.$loaded).toBe(true);
     }));
 
+    it('should resolve simple data', inject(function($rootScope, dataDependFactory) {
+
+      // given
+      var $data = dataDependFactory.create(),
+          loadedFoo, loadedBar;
+
+      // when
+      $data.set([ 'foo', 'bar' ], function() {
+        return [ 'FOO', 'BAR' ];
+      });
+
+      var fooStatus = $data.get('foo', function(foo) {
+        loadedFoo = foo;
+      });
+
+      var barStatus = $data.get('bar', function(bar) {
+        loadedBar = bar;
+      });
+
+      // then
+      expect(fooStatus.$loaded).not.toBe(true);
+      expect(barStatus.$loaded).not.toBe(true);
+
+      // but after
+      $rootScope.$digest();
+
+      // then
+      expect(loadedFoo).toEqual('FOO');
+      expect(loadedBar).toEqual('BAR');
+
+      expect(fooStatus.$loaded).toBe(true);
+      expect(barStatus.$loaded).toBe(true);
+    }));
+
     it('should resolve deferred data', inject(function($rootScope, $q, dataDependFactory) {
 
       // given
@@ -95,7 +129,7 @@ describe('dataDepend', function() {
       expect(loadedFoo).toBe(setFoo);
     }));
 
-    it('should update after #set', inject(function($rootScope, $q, dataDependFactory) {
+    it('should update after #set', inject(function($rootScope, dataDependFactory) {
 
       // given
       var $data = dataDependFactory.create(),
@@ -129,7 +163,6 @@ describe('dataDepend', function() {
     }));
   });
 
-
   describe('provider', function() {
 
     var __dataFactory;
@@ -148,9 +181,23 @@ describe('dataDepend', function() {
 
         options = angular.extend(options, { registry: providers });
 
+        var produces = options.produces;
         var provider = __dataFactory.create(options);
 
-        providers[options.name] = provider;
+        if (angular.isArray(produces)) {
+          var __resolve = provider.resolve;
+
+          angular.forEach(produces, function(name, index) {
+            providers[name] = angular.extend({}, provider, { 
+              resolve: function(options) {
+                options = angular.extend(options || {}, { name: name });
+                return __resolve(options);
+              }
+            });
+          });
+        } else {
+          providers[produces] = provider;
+        }
 
         return provider;
       };
@@ -165,7 +212,7 @@ describe('dataDepend', function() {
       var createProvider = createProviderFactory();
 
       var provider = createProvider({
-        name: 'foo', 
+        produces: 'foo', 
         factory: function() {
           return 'FOO';
         }
@@ -194,14 +241,14 @@ describe('dataDepend', function() {
       var createProvider = createProviderFactory();
 
       var fooProvider = createProvider({
-        name: 'foo', 
+        produces: 'foo', 
         factory: function() {
           return 'FOO';
         }
       });
 
       var barProvider = createProvider({ 
-        name: 'bar', 
+        produces: 'bar', 
         dependencies: ['foo'],
         factory: function(foo) {
           return foo;
@@ -222,12 +269,12 @@ describe('dataDepend', function() {
       var createProvider = createProviderFactory();
 
       var fooProvider = createProvider({
-        name: 'foo', 
+        produces: 'foo', 
         value: 'FOO'
       });
 
       var barProvider = createProvider({ 
-        name: 'bar', 
+        produces: 'bar', 
         dependencies: ['foo'],
         factory: function(foo) {
           return foo;
@@ -253,7 +300,7 @@ describe('dataDepend', function() {
       var fooDeferred;
 
       var fooProvider = createProvider({
-        name: 'foo', 
+        produces: 'foo', 
         factory: function() {
           fooDeferred = $q.defer();
 
@@ -262,7 +309,7 @@ describe('dataDepend', function() {
       });
 
       var barProvider = createProvider({ 
-        name: 'bar', 
+        produces: 'bar', 
         dependencies: ['foo'],
         eager: true,
         factory: function(foo) {
@@ -286,17 +333,78 @@ describe('dataDepend', function() {
       expect(fooProvider.get()).toBe('FOO');
     }));
 
+    it('should produce multiple values', inject(function($rootScope) {
+
+      var createProvider = createProviderFactory();
+
+      var rootProvider = createProvider({
+        produces: [ 'a', 'b' ],
+        factory: function() {
+          return [ 'A', 'B' ];
+        }
+      });
+
+      var cProvider = createProvider({
+        produces: 'c', 
+        dependencies: [ 'a' ],
+        factory: function(a) {
+          return a + '-C';
+        }
+      });
+
+      var dProvider = createProvider({
+        produces: 'd', 
+        dependencies: [ 'b' ],
+        factory: function(b) {
+          return b + '-D';
+        }
+      });
+
+      var eProvider = createProvider({
+        produces: 'e', 
+        dependencies: [ 'a', 'b' ],
+        factory: function(a, b) {
+          return a + '-' + b + '-E';
+        }
+      });
+
+      // when
+      rootProvider.resolve();
+      $rootScope.$digest();
+
+      // then
+      expect(rootProvider.get()).toEqual([ 'A', 'B' ]);
+
+      // but when
+      cProvider.resolve();
+      $rootScope.$digest();
+
+      expect(cProvider.get()).toEqual('A-C');
+
+      // but when
+      dProvider.resolve();
+      $rootScope.$digest();
+
+      expect(dProvider.get()).toEqual('B-D');
+
+      // but when
+      eProvider.resolve();
+      $rootScope.$digest();
+
+      expect(eProvider.get()).toEqual('A-B-E');
+    }));
+
     it('should handle nested dependent data changes (X)', inject(function($rootScope) {
 
       var createProvider = createProviderFactory();
 
       var a1Provider = createProvider({
-        name: 'a1', 
+        produces: 'a1', 
         value: 'A1'
       });
 
       var a2Provider = createProvider({
-        name: 'a2', 
+        produces: 'a2', 
         value: 'A2'
       });
 
@@ -305,7 +413,7 @@ describe('dataDepend', function() {
       });
 
       var bProvider = createProvider({
-        name: 'b',
+        produces: 'b',
         dependencies: [ 'a1', 'a2' ], 
         factory: bFactory
       });
@@ -315,7 +423,7 @@ describe('dataDepend', function() {
       });
 
       var c1Provider = createProvider({
-        name: 'c1', 
+        produces: 'c1', 
         dependencies: [ 'b' ],
         eager: true, 
         factory: c1Factory
@@ -326,7 +434,7 @@ describe('dataDepend', function() {
       });
 
       var c2Provider = createProvider({
-        name: 'c2', 
+        produces: 'c2', 
         dependencies: [ 'b' ],
         eager: true, 
         factory: c2Factory
@@ -366,7 +474,7 @@ describe('dataDepend', function() {
       var createProvider = createProviderFactory();
 
       var aProvider = createProvider({
-        name: 'a', 
+        produces: 'a', 
         value: 'A'
       });
 
@@ -375,7 +483,7 @@ describe('dataDepend', function() {
       });
       
       var b1Provider = createProvider({
-        name: 'b1',
+        produces: 'b1',
         dependencies: [ 'a' ], 
         factory: b1Factory
       });
@@ -385,7 +493,7 @@ describe('dataDepend', function() {
       });
 
       var b2Provider = createProvider({
-        name: 'b2', 
+        produces: 'b2', 
         dependencies: [ 'a' ],
         factory: b2Factory
       });
@@ -395,7 +503,7 @@ describe('dataDepend', function() {
       });
 
       var cProvider = createProvider({
-        name: 'c', 
+        produces: 'c', 
         dependencies: [ 'b1', 'b2' ],
         eager: true, 
         factory: cFactory
@@ -437,7 +545,7 @@ describe('dataDepend', function() {
       var createProvider = createProviderFactory();
 
       var aProvider = createProvider({
-        name: 'a', 
+        produces: 'a', 
         value: 'A'
       });
 
@@ -446,7 +554,7 @@ describe('dataDepend', function() {
       });
       
       var b1Provider = createProvider({
-        name: 'b1',
+        produces: 'b1',
         dependencies: [ 'a' ], 
         eager: true,
         factory: b1Factory
@@ -457,7 +565,7 @@ describe('dataDepend', function() {
       });
 
       var b2Provider = createProvider({
-        name: 'b2', 
+        produces: 'b2', 
         dependencies: [ 'a' ],
         factory: b2Factory
       });
@@ -494,7 +602,7 @@ describe('dataDepend', function() {
       var createProvider = createProviderFactory();
       
       var fooProvider = createProvider({
-        name: 'foo',
+        produces: 'foo',
         factory: function (a) {
           return 'FOO';
         }

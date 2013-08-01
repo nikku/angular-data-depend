@@ -39,11 +39,12 @@
           
           options = options || {};
 
-          var name = options.name,
+          var produces = options.produces,
               registry = options.registry,
               dependencies = options.dependencies || [],
               factory = options.factory, 
-              eager = options.eager || false;
+              eager = options.eager || false,
+              multiple = isArray(produces);
 
           var parentValues = {},
               children = [],
@@ -55,7 +56,7 @@
           // element produced by 
           // the factory
           var provider = {
-            name: name,
+            produces: produces,
             data: data,
             get: get, 
             set: set,
@@ -200,17 +201,35 @@
            * Resolve the value of this data holder
            */
           function resolve(options) {
-            var reload = (options || {}).reload;
+            options = options || {};
+
+            var reload = options.reload,
+                name = options.name;
+
+            if (name && !multiple) {
+              throw new Error("[dataDepend] Cannot resolve name " + name + " no multi-provider");
+            }
 
             if (dirty || reload) {
               loading = asyncLoad(reload);
             }
 
+            var promise;
+
             if (loading) {
-              return loading;
+              promise = loading;
             } else {
-              return $q.when(get());
+              promise = $q.when(get());
             }
+
+            if (name) {
+              promise = promise.then(function(values) {
+                var idx = produces.indexOf(name);
+                return values[idx];
+              });
+            }
+
+            return promise;
           }
 
           function set(value) {
@@ -268,12 +287,12 @@
             }
 
             var provider = internalCreateProvider({
-              name: name, 
+              produces: name, 
               factory: callback, 
               dependencies: variables, 
               eager: true,
               registry: providers
-            })
+            });
 
             // return handle to the
             // providers data
@@ -281,15 +300,29 @@
           }
 
           function internalCreateProvider(options) {
-            var name = options.name,
+            var produces = options.produces,
                 provider;
 
-            if (!name) {
-              throw new Error("[dataDepend] Must provide name when creating new provider");
+            if (!produces) {
+              throw new Error("[dataDepend] Must provide produces when creating new provider");
             }
 
             provider = dataProviderFactory.create(options);
-            providers[name] = provider;
+
+            if (isArray(produces)) {
+              var __resolve = provider.resolve;
+
+              angular.forEach(produces, function(name, index) {
+                providers[name] = angular.extend({}, provider, { 
+                  resolve: function(options) {
+                    options = angular.extend(options || {}, { name: name });
+                    return __resolve(options);
+                  }
+                });
+              });
+            } else {
+              providers[produces] = provider;
+            }
 
             return provider;
           }
@@ -317,7 +350,7 @@
             }
 
             var provider = internalCreateProvider({
-              name: name, 
+              produces: name, 
               factory: factory,
               value: value,
               dependencies: variables, 
