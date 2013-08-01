@@ -1,3 +1,16 @@
+/**
+ * dataDepend - a toolkit for implementing complex, data heavy applications
+ *
+ * See https://github.com/Nikku/angular-data-depend for details.
+ *
+ * @version 1.1.0
+ *
+ * @author Nico Rehwaldt <http://github.com/Nikku>
+ * @author Roman Smirnov <https://github.com/romansmirnov>
+ *
+ * @license (c) 2013 Nico Rehwaldt, MIT
+ */
+
 (function(angular) {
   
   function createBinding(angular) {
