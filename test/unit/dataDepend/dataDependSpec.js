@@ -129,7 +129,8 @@ describe('dataDepend', function() {
     }));
   });
 
-  describe('data', function() {
+
+  describe('provider', function() {
 
     var __dataFactory;
 
@@ -494,7 +495,6 @@ describe('dataDepend', function() {
       
       var fooProvider = createProvider({
         name: 'foo',
-        eager: true,
         factory: function (a) {
           return 'FOO';
         }
