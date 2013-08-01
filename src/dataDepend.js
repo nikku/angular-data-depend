@@ -31,6 +31,10 @@
       }
     }
 
+    function toArray(arrayLike) {
+      return Array.prototype.slice.apply(arrayLike);
+    }
+
     var dataProviderFactory = [ '$rootScope', '$q', function($rootScope, $q) {
       
       function createFactory(nextTick) {
@@ -43,8 +47,7 @@
               registry = options.registry,
               dependencies = options.dependencies || [],
               factory = options.factory, 
-              eager = options.eager || false,
-              multiple = isArray(produces);
+              eager = options.eager || false;
 
           var parentValues = {},
               children = [],
@@ -70,7 +73,9 @@
           });
 
           if (eager) {
+            log('resolve async');
             nextTick(function() {
+              log('resolve');
               resolve();
             });
           }
@@ -79,14 +84,29 @@
             setLoaded(options.value);
           }
 
-          function setLoaded(v) {
-            data.value = v;
+          function setLoaded(newValue) {
+
+            var oldValue = data.value;
+
             data.$loaded = true;
             changed = false;
 
-            allChildrenDo(function(child) {
-              child.parentChanged();
-            });
+            if (oldValue !== newValue) {
+              data.value = newValue;
+              
+              log('setLoaded', oldValue, ' -> ', newValue);
+
+              notifyParentChanged();
+            }
+          }
+
+          function getTracker(name) {
+            var tracker = parentValues[name];
+            if (!tracker) {
+              parentValues[name] = tracker = {};
+            }
+
+            return tracker;
           }
 
           function setLoading() {
@@ -112,33 +132,71 @@
             forEach(dependencies, fn);
           }
 
+          function notifyParentChanged() {
+            allChildrenDo(function(child) {
+              child.parentChanged();
+            });
+          }
+
           function resolveDependencies() {
             var promises = [];
+
+            function logValue(d, value) {
+              var tracker = getTracker(d),
+                  oldValue = tracker.value;
+
+              log('resolveDependencies', d, ':', oldValue, '->', value);
+
+              if (oldValue !== value) {
+                log('resolveDependencies', 'changed');
+                
+                tracker.value = value;
+                changed = true;
+              }
+            }
 
             allDependenciesDo(function(d) {
               var provider = getProvider(d);
 
               var promise = provider.resolve().then(function(value) {
-
-                var oldValue = parentValues[d];
-                if (oldValue != value) {
-                  parentValues[d] = value;
-                  changed = true;
-                }
-
+                logValue(d, value);
                 return value;
               });
 
               promises.push(promise);
             });
 
-            return promises;
+            return $q.all(promises).then(function() {
+
+              var values = [];
+
+              // best effort to receive up-to-date values
+              // return the most current one
+              allDependenciesDo(function(d) {
+                var v = getProvider(d).get();
+
+                logValue(d, v);
+
+                values.push(v);
+              });
+
+              return values;
+            });
           }
 
           function asyncLoad(reload) {
             setLoading();
 
-            var promise = $q.all(resolveDependencies()).then(function(values) {
+            log('asyncLoad: init load');
+
+            var promise = resolveDependencies().then(function(values) {
+
+              log('asyncLoad dependencies resolved', values);
+
+              if (loading !== promise) {
+                log('asyncLoad: skip (new load request)');
+                return loading;
+              }
 
               var value = get();
 
@@ -148,18 +206,23 @@
                 // (i.e. if parent variables changed, reload is explicitly set
                 // or no dependencies are given)
                 if (changed || reload || values.length == 0) {
+                  log('asyncLoad: call factory');
                   value = factory.apply(factory, values);
                 }
               }
 
               return value;
             }).then(function(value) {
-              if (loading === promise) {
-                loading = null;
+
+              if (loading !== promise) {
+                log('asyncLoad: skip (new load request)');
+                return loading;
               }
 
-              setLoaded(value);
+              log('asyncLoad: load complete');
 
+              loading = null;
+              setLoaded(value);
               return value;
             });
 
@@ -172,9 +235,12 @@
            *
            */
           function parentChanged() {
-            
+
+            log('parentChanged START');
+
             // anticipating parent change, everything ok
             if (loading) {
+              log('parentChanged SKIP (loading)');
               return;
             }
 
@@ -183,14 +249,15 @@
             // should this provider resolve its data 
             // eagerly if it got dirty
             if (eager) {
+              log('parentChanged RESOLVE async');
+
               nextTick(function() {
+                log('parentChanged RESOLVE');
                 resolve();
               });
             }
 
-            allChildrenDo(function(child) {
-              child.parentChanged();
-            });
+            notifyParentChanged();
           }
 
           function get() {
@@ -203,33 +270,19 @@
           function resolve(options) {
             options = options || {};
 
-            var reload = options.reload,
-                name = options.name;
-
-            if (name && !multiple) {
-              throw new Error("[dataDepend] Cannot resolve name " + name + " no multi-provider");
-            }
+            var reload = options.reload;
 
             if (dirty || reload) {
               loading = asyncLoad(reload);
             }
 
-            var promise;
-
             if (loading) {
-              promise = loading;
+              log('resolve: load async');
+              return loading;
             } else {
-              promise = $q.when(get());
+              log('resolve: load sync');
+              return $q.when(get());
             }
-
-            if (name) {
-              promise = promise.then(function(values) {
-                var idx = produces.indexOf(name);
-                return values[idx];
-              });
-            }
-
-            return promise;
           }
 
           function set(value) {
@@ -238,6 +291,14 @@
             }
 
             setLoaded(value);
+          }
+
+          function log() {
+            // var args = toArray(arguments);
+            // args.unshift('[' + produces + ']');
+            // args.unshift('[dataDepend]');
+
+            // console.log.apply(console, args);
           }
 
           return provider;
@@ -310,13 +371,28 @@
             provider = dataProviderFactory.create(options);
 
             if (isArray(produces)) {
+
+              var __get = provider.get;
               var __resolve = provider.resolve;
 
-              angular.forEach(produces, function(name, index) {
+              forEach(produces, function(name, idx) {
+
+                function filter(values) {
+                  if (!values) {
+                    return values;
+                  } else {
+                    return values[idx];
+                  }
+                }
+
                 providers[name] = angular.extend({}, provider, { 
-                  resolve: function(options) {
-                    options = angular.extend(options || {}, { name: name });
-                    return __resolve(options);
+                  resolve: function() {
+                    var args = toArray(arguments);
+                    return __resolve.apply(null, args).then(filter);
+                  },
+                  get: function() {
+                    var args = toArray(arguments);
+                    return filter(__get.apply(null, args));
                   }
                 });
               });
