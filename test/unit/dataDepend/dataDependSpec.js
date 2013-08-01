@@ -2,39 +2,9 @@ describe('dataDepend', function() {
 
   beforeEach(module('dataDepend'));
 
-/*  describe('API', function() {
+  describe('API', function() {
 
-    it('should offer #set', inject(function(dataDependFactory) {
-
-      // given
-      var $data = dataDependFactory.create();
-
-      // then
-      expect($data.set).toBeDefined();
-    }));
-
-    it('should offer #get', inject(function(dataDependFactory) {
-
-      // given
-      var $data = dataDependFactory.create();
-
-      // then
-      expect($data.get).toBeDefined();
-    }));
-
-    if ('should offer #changed', inject(function(dataDependFactory) {
-
-      // given
-      var $data = dataDependFactory.create();
-
-      // then
-      expect($data.changed).toBeDefined();
-    }));
-  });
-
-  describe('functionality', function() {
-
-    it('should set simple data', inject(function($rootScope, dataDependFactory) {
+    it('should resolve simple data', inject(function($rootScope, dataDependFactory) {
 
       // given
       var $data = dataDependFactory.create(),
@@ -60,7 +30,7 @@ describe('dataDepend', function() {
       expect(status.$loaded).toBe(true);
     }));
 
-    it('should set deferred data', inject(function($rootScope, $q, dataDependFactory) {
+    it('should resolve deferred data', inject(function($rootScope, $q, dataDependFactory) {
 
       // given
       var $data = dataDependFactory.create(),
@@ -92,7 +62,7 @@ describe('dataDepend', function() {
       expect(loadedFoo).toBe('FOO');
     }));
 
-    it('should update changed data via #changed', inject(function($rootScope, $q, dataDependFactory) {
+    it('should update on #changed', inject(function($rootScope, $q, dataDependFactory) {
 
       // given
       var $data = dataDependFactory.create(),
@@ -125,18 +95,18 @@ describe('dataDepend', function() {
       expect(loadedFoo).toBe(setFoo);
     }));
 
-    it('should update changed data via #set', inject(function($rootScope, $q, dataDependFactory) {
+    it('should update after #set', inject(function($rootScope, $q, dataDependFactory) {
 
       // given
       var $data = dataDependFactory.create(),
           loadedFoo;
 
       // when
+      $data.set('bar', 'BAR');
+
       $data.set('foo', [ 'bar', function(bar) {
         return bar;
       }]);
-
-      $data.set('bar', 'BAR');
 
       var status = $data.get('foo', function(foo) {
         loadedFoo = foo;
@@ -157,7 +127,7 @@ describe('dataDepend', function() {
       expect(status.$loaded).toBe(true);
       expect(loadedFoo).toBe('FOOBAR');
     }));
-  });*/
+  });
 
   describe('data', function() {
 
@@ -167,19 +137,19 @@ describe('dataDepend', function() {
       __dataFactory = dataProviderFactory;
     }));
 
-    function createProviderFactory(dataDepend) {
+    function createProviderFactory(providers) {
 
-      if (!dataDepend) {
-        dataDepend = { providers: {} };
+      if (!providers) {
+        providers = {};
       }
 
       return function createProvider(options) {
 
-        options = angular.extend(options, { registry: dataDepend });
+        options = angular.extend(options, { registry: providers });
 
         var provider = __dataFactory.create(options);
 
-        dataDepend.providers[options.name] = provider;
+        providers[options.name] = provider;
 
         return provider;
       };

@@ -81,8 +81,7 @@
           }
 
           function getProvider(key) {
-            var providers = registry.providers,
-                provider = providers[key];
+            var provider = registry[key];
             
             if (!provider) {
               throw new Error('[dataDepend] No provider for ' + key);
@@ -129,8 +128,12 @@
 
               var value = get();
 
-              if (changed || reload) {
-                if (factory) {
+              if (factory) {
+
+                // call factory only if neccessary
+                // (i.e. if parent variables changed, reload is explicitly set
+                // or no dependencies are given)
+                if (changed || reload || values.length == 0) {
                   value = factory.apply(factory, values);
                 }
               }
@@ -219,26 +222,108 @@
       });
     }];
 
-    var dataDependFactory = [ '$rootScope', '$q', '$injector', function($rootScope, $q, $injector) {
+    var dataDependFactory = [ '$rootScope', '$injector', 'dataProviderFactory', function($rootScope, $injector, dataProviderFactory) {
 
-      var annotate = $injector.annotate;
-
-      function createFactory(nextTick) {
+      function createFactory(nextTick, annotate) {
 
         function create() {
 
+          var nextId = 0;
           var providers = {};
 
           function get(variables, callback) {
 
+            var name = 'provider$' + nextId++;
+            
+            if (!callback) {
+              // parse callback and variables from 
+              // [ 'A', 'B', function(A, B) { ... }] notation 
+              callback = variables;
+              variables = annotate(callback);
+
+              if (isArray(callback)) {
+                callback = callback[callback.length - 1];
+              }
+            } else {
+              // make sure we can use get('asdf', function(asdf) { })
+              // in place of get([ 'asdf' ], function(asdf) { })
+              variables = ensureArray(variables);
+            }
+
+            if (!isFunction(callback)) {
+              throw new Error('[dataDepend] Must provide callback as second parameter or use [ "A", "B", function(a, b) { } ] notation');
+            }
+
+            var provider = internalCreateProvider({
+              name: name, 
+              factory: callback, 
+              dependencies: variables, 
+              eager: true,
+              registry: providers
+            })
+
+            // return handle to the
+            // providers data
+            return provider.data;
+          }
+
+          function internalCreateProvider(options) {
+            var name = options.name,
+                provider;
+
+            if (!name) {
+              throw new Error("[dataDepend] Must provide name when creating new provider");
+            }
+
+            provider = dataProviderFactory.create(options);
+            providers[name] = provider;
+
+            return provider;
           }
 
           function set(name, value) {
-            
+            var provider = providers[name],
+                factory, 
+                variables;
+
+            if (provider) {
+              provider.set(value);
+              return;
+            }
+
+            if (isFunction(value) || isArray(value)) {
+              // parse factory and variables from 
+              // [ 'A', 'B', function(A, B) { ... }] notation 
+              factory = value;
+              variables = annotate(factory);
+              value = undefined;
+
+              if (isArray(factory)) {
+                factory = factory[factory.length - 1];
+              }
+            }
+
+            var provider = internalCreateProvider({
+              name: name, 
+              factory: factory,
+              value: value,
+              dependencies: variables, 
+              registry: providers
+            });
+
+            // return handle to the
+            // providers data
+            return provider.data;
           }
 
           function changed(name) {
+            var provider = providers[name];
 
+            if (!provider) {
+              throw new Error('[dataDepend] Provider "' + name + '" does not exists');
+            }
+
+            provider.resolve({ reload: true });
           }
 
           return {
@@ -255,7 +340,7 @@
         };
       }
 
-      return createFactory(function(fn) {
+      return createFactory($injector.annotate, function(fn) {
         $rootScope.$evalAsync(fn);
       });
     }];
