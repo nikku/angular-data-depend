@@ -224,7 +224,7 @@
 
     var dataDependFactory = [ '$rootScope', '$injector', 'dataProviderFactory', function($rootScope, $injector, dataProviderFactory) {
 
-      function createFactory(nextTick, annotate) {
+      function createFactory(annotate, nextTick) {
 
         function create() {
 
