@@ -1,9 +1,9 @@
 /**
- * dataDepend - a toolkit for implementing complex, data heavy applications
+ * dataDepend - a toolkit for implementing complex, data heavy AngularJS applications
  *
  * See https://github.com/Nikku/angular-data-depend for details.
  *
- * @version 1.1.0
+ * @version 1.0.0
  *
  * @author Nico Rehwaldt <http://github.com/Nikku>
  * @author Roman Smirnov <https://github.com/romansmirnov>

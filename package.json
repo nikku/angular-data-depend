@@ -1,7 +1,7 @@
 {
   "name": "angular-data-depend",
   "author": "Nico Rehwaldt <https://github.com/Nikku>",
-  "description": "A toolkit for implementing complex, data heavy applications",
+  "description": "A toolkit for implementing complex, data heavy AngularJS applications",
   "version": "1.0.0",
   "repository": {
     "type": "git",
@@ -9,7 +9,8 @@
   },
   "keywords": [
     "angularjs",
-    "data"
+    "data",
+    "async"
   ],
   "scripts": {
     "test": "grunt travis --verbose"

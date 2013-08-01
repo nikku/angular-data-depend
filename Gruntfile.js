@@ -5,6 +5,10 @@ module.exports = function(grunt) {
     pkg: grunt.file.readJSON('package.json'),
 
     uglify: {
+      options: {
+        banner: '/* <%= pkg.name %> - v<%= pkg.version %> - <%= grunt.template.today("yyyy-mm-dd") %> | '
+          + '(c) 2013 Nico Rehwaldt | <%= pkg.license %> */\n'
+      },
       main: {
         files: {
           'dist/dataDepend.min.js': [ 'src/dataDepend.js' ]
