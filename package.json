@@ -19,9 +19,16 @@
     "grunt": "~0.4.1",
     "grunt-contrib-jshint": "~0.1.1",
     "grunt-contrib-nodeunit": "~0.1.2",
-    "grunt-karma": "~0.5.0",
     "grunt-contrib-uglify": "~0.2.2",
-    "grunt-contrib-watch": "~0.5.1"
+    "grunt-contrib-watch": "~0.5.1",
+    "grunt-karma": "~0.5.0",
+    "karma": "~0.9",
+    "karma-script-launcher": "~0.0",
+    "karma-chrome-launcher": "~0.0",
+    "karma-firefox-launcher": "~0.0",
+    "karma-jasmine": "~0.0",
+    "karma-phantomjs-launcher": "~0.0",
+    "karma-junit-reporter": "~0.0.2"
   },
   "license": "MIT"
 }

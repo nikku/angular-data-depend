@@ -17,8 +17,10 @@ module.exports = function(config) {
 
     autoWatch: true,
 
+    reporters: [ 'progress', 'junit' ],
+
     junitReporter: {
-      outputFile: '../build/test-reports/js-unit.xml',
+      outputFile: 'build/test-reports/js-unit.xml',
       suite: 'unit'
     },
 
@@ -26,7 +28,8 @@ module.exports = function(config) {
       'karma-chrome-launcher',
       'karma-firefox-launcher',
       'karma-phantomjs-launcher',
-      'karma-jasmine'
+      'karma-jasmine',
+      'karma-junit-reporter'
     ]
   });
 };
