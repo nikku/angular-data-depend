@@ -39,6 +39,13 @@
       
       function createFactory(nextTick) {
 
+        /**
+         * Create a provider using the specified options
+         * 
+         * @param {object} options
+         *
+         * @returns {object} the newly created, unregistered provider
+         */
         function create(options) {
           
           options = options || {};
@@ -304,8 +311,58 @@
           return provider;
         };
 
+        /**
+         * Return a filtered view on the provider, that exposes only
+         * the dependency with the given name, if multiple dependencies
+         * are produced. 
+         *
+         * @param {object} provider the provider to filter
+         * @param {string} name the produced name to filter for
+         *
+         * @returns {object} a view on the provider that filters for the
+         *                   specified name
+         *
+         * @throws error if the provider is not a multi provider
+         */
+        function filtered(provider, name) {
+
+          if (!isArray(provider.produces)) {
+            throw new Error('[dataDepend] Provider does not produce multiple values');
+          }
+
+          var idx = provider.produces.indexOf(name),
+              __get = provider.get,
+              __resolve = provider.resolve;
+
+          function filter(values) {
+            if (!values) {
+              return values;
+            } else {
+              return values[idx];
+            }
+          }
+          
+          function resolve() {
+            var args = toArray(arguments);
+            return __resolve.apply(null, args).then(filter);
+          }
+
+          function get() {
+            var args = toArray(arguments);
+            return filter(__get.apply(null, args));
+          }
+
+          var filteredProvider = angular.extend({}, provider, { 
+            resolve: resolve,
+            get: get
+          });
+
+          return filteredProvider;
+        }
+
         // factory
         return {
+          filtered: filtered,
           create: create
         };
       }
@@ -371,30 +428,8 @@
             provider = dataProviderFactory.create(options);
 
             if (isArray(produces)) {
-
-              var __get = provider.get;
-              var __resolve = provider.resolve;
-
-              forEach(produces, function(name, idx) {
-
-                function filter(values) {
-                  if (!values) {
-                    return values;
-                  } else {
-                    return values[idx];
-                  }
-                }
-
-                providers[name] = angular.extend({}, provider, { 
-                  resolve: function() {
-                    var args = toArray(arguments);
-                    return __resolve.apply(null, args).then(filter);
-                  },
-                  get: function() {
-                    var args = toArray(arguments);
-                    return filter(__get.apply(null, args));
-                  }
-                });
+              forEach(produces, function(name) {
+                providers[name] = dataProviderFactory.filtered(provider, name);
               });
             } else {
               providers[produces] = provider;
@@ -403,6 +438,12 @@
             return provider;
           }
 
+          /**
+           * Set variable to the given value
+           * 
+           * @param {string} name of the variable
+           * @param {function | object | array } value the value to initialize the object with
+           */
           function set(name, value) {
             var provider = providers[name],
                 factory, 

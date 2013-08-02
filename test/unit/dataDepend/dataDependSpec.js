@@ -189,30 +189,8 @@ describe('dataDepend', function() {
         var provider = __dataFactory.create(options);
 
         if (angular.isArray(produces)) {
-
-          var __get = provider.get;
-          var __resolve = provider.resolve;
-
-          angular.forEach(produces, function(name, idx) {
-
-            function filter(values) {
-              if (!values) {
-                return values;
-              } else {
-                return values[idx];
-              }
-            }
-
-            providers[name] = angular.extend({}, provider, { 
-              resolve: function() {
-                var args = toArray(arguments);
-                return __resolve.apply(null, args).then(filter);
-              },
-              get: function() {
-                var args = toArray(arguments);
-                return filter(__get.apply(null, args));
-              }
-            });
+          angular.forEach(produces, function(name) {
+            providers[name] = __dataFactory.filtered(provider, name);
           });
         } else {
           providers[produces] = provider;
