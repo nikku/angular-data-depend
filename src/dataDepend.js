@@ -376,7 +376,7 @@
 
       function createFactory(annotate, nextTick) {
 
-        function create() {
+        function create(scope) {
 
           var nextId = 0;
           var providers = {};
@@ -439,6 +439,41 @@
           }
 
           /**
+           * Watches an expression on the scope this object was registered on
+           * and publishes that value as a variable.
+           *
+           * The old value of the watch expression is published as {name}:old in the object.
+           *
+           * @param {string} name of the variable to publish
+           * @param {string} expression (optional) expression used to watch on the scope (defaults to name)
+           *
+           * @return {object} data object representing the load status
+           */
+          function watchScope(name, expression) {
+            expression = expression || name;
+
+            var oldValueName = name + ':old';
+
+            // create provider
+            set(name, scope.$eval(expression));
+            set(oldValueName, null);
+
+            var provider = providers[name];
+            var oldValueProvider = providers[oldValueName];
+
+            scope.$watch(expression, function(newValue, oldValue) {
+              if (newValue !== oldValue) {
+                provider.set(newValue);
+
+                // publish old value as {name}:old
+                oldValueProvider.set(oldValue);
+              }
+            });
+
+            return provider.data;
+          }
+
+          /**
            * Set variable to the given value
            * 
            * @param {string} name of the variable
@@ -494,7 +529,8 @@
 
             get: get,
             set: set,
-            changed: changed
+            changed: changed,
+            watchScope: watchScope
           };
         }
 
