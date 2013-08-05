@@ -17,7 +17,7 @@ module.exports = function(config) {
 
     autoWatch: true,
 
-    reporters: [ 'junit' ],
+    reporters: [ 'progress', 'junit' ],
     
     junitReporter: {
       outputFile: 'build/test-reports/js-unit.xml',

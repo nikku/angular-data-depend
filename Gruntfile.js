@@ -25,7 +25,7 @@ module.exports = function(grunt) {
 
     karma: {
       unit: {
-        configFile: 'config/karma.unit.js',
+        configFile: 'config/karma.unit.js'
       },
       single: {
         configFile: 'config/karma.unit.js',
@@ -45,8 +45,8 @@ module.exports = function(grunt) {
 
   grunt.loadNpmTasks('grunt-contrib-watch');
 
-  // default task: minify sources and publish to ./build
-  grunt.registerTask( 'default', [ 'dist' ]);
+  // default task: test
+  grunt.registerTask( 'default', [ 'test-single' ]);
 
   // travis task
   grunt.registerTask('travis', [ 'default' ]);
@@ -54,5 +54,6 @@ module.exports = function(grunt) {
   // test task
   grunt.registerTask( 'test-single', [ 'karma:single' ]);
 
+  // minify + test
   grunt.registerTask( 'dist', [ 'uglify', 'karma:singleDist' ]);
 };
