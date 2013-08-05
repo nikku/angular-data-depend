@@ -161,6 +161,102 @@ describe('dataDepend', function() {
       expect(status.$loaded).toBe(true);
       expect(loadedFoo).toBe('FOOBAR');
     }));
+
+    it('should provide access to scope bindings via #watchScope', inject(function($rootScope, dataDependFactory) {
+
+      // given
+      var $data = dataDependFactory.create($rootScope),
+          foo, bar, fooBar;
+
+      $rootScope.foo = 'FOO';
+
+      // when
+      $data.watchScope('bar');
+      $data.watchScope('fooBar', 'foo.bar');
+      $data.watchScope('foo');
+
+      var status = $data.get([ 'foo', 'bar', 'fooBar' ], function(_foo, _bar, _fooBar) {
+        foo = _foo;
+        bar = _bar;
+        fooBar = _fooBar;
+      });
+
+      $rootScope.$digest();
+
+      // then
+      expect(foo).toEqual($rootScope.foo);
+      expect(bar).toEqual($rootScope.bar);
+      expect(fooBar).not.toBeDefined();
+
+      // when changes in scope
+
+      $rootScope.foo = { bar: 'FOOBAR' };
+
+      $rootScope.$digest();
+
+      expect(foo).toBe($rootScope.foo);
+      expect(bar).toEqual($rootScope.bar);
+      expect(fooBar).toBe($rootScope.foo.bar);
+
+      // when removing scope binding
+
+      delete $rootScope.foo;
+
+      $rootScope.$digest();
+
+      expect(foo).toBe($rootScope.foo);
+      expect(bar).toEqual($rootScope.bar);
+      expect(fooBar).not.toBeDefined();
+    }));
+
+    it('should provide access to old scope bindings via #watchScope and :old suffix', inject(function($rootScope, dataDependFactory) {
+
+      // given
+      var $data = dataDependFactory.create($rootScope),
+          foo, fooOld, bar, barOld;
+
+      $rootScope.foo = 'FOO';
+
+      // when
+      $data.watchScope('bar', 'bar');
+      $data.watchScope('foo');
+
+      var status = $data.get([ 'foo', 'foo:old', 'bar', 'bar:old'], function(_foo, _fooOld, _bar, _barOld) {
+        foo = _foo;
+        fooOld = _fooOld;
+        bar = _bar;
+        barOld = _barOld;
+      });
+
+      $rootScope.$digest();
+
+      // then
+      expect(foo).toEqual($rootScope.foo);
+      expect(fooOld).toEqual(null);
+      expect(bar).toEqual($rootScope.bar);
+      expect(barOld).toEqual(null);
+
+      // when changes in scope
+
+      $rootScope.foo = 'FOOBAR';
+      $rootScope.bar = 'BAR';
+
+      $rootScope.$digest();
+
+      expect(foo).toEqual($rootScope.foo);
+      expect(fooOld).toEqual('FOO');
+      expect(bar).toEqual($rootScope.bar);
+      expect(barOld).toEqual(null);
+      
+      // when removing scope binding
+
+      delete $rootScope.foo;
+
+      $rootScope.$digest();
+
+      expect(foo).toBe($rootScope.foo);
+      expect(fooOld).toEqual('FOOBAR');
+    })); 
   });
 
   describe('provider', function() {
@@ -608,6 +704,6 @@ describe('dataDepend', function() {
       expect(function() {
         fooProvider.set('BAR');
       }).toThrow
-    })); 
+    }));
   });
 });
