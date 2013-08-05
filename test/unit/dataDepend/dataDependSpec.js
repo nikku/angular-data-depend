@@ -2,6 +2,10 @@ describe('dataDepend', function() {
 
   beforeEach(module('dataDepend'));
 
+  function spyOnFunction(fn) {
+    return jasmine.createSpy().andCallFake(fn);
+  }
+
   describe('API', function() {
 
     it('should resolve simple data', inject(function($rootScope, dataDependFactory) {
@@ -257,9 +261,61 @@ describe('dataDepend', function() {
       expect(foo).toBe($rootScope.foo);
       expect(fooOld).toEqual('FOOBAR');
     })); 
+
+    describe('consistency', function() {
+
+      it('should resolve factory with most up-to-date value on out of order update', inject(function($rootScope, $q, dataDependFactory) {
+
+        // given
+        var $data = dataDependFactory.create(),
+            deferredB = $q.defer(),
+            a, b, c;
+
+        // when
+        $data.set('a', 'A');
+
+        $data.set('b', [ 'a', function(a) {
+          return deferredB.promise.then(function(b) {
+            return a + '-' + b;
+          });
+        }]);
+
+        $data.set('c', [ 'a', 'b', function(a, b) {
+          return a + '-' + b + '-C';
+        }]);
+
+        var status = $data.get([ 'a', 'b', 'c' ], function(_a, _b, _c) {
+          a = _a;
+          b = _b;
+          c = _c;
+        });
+
+        // when
+        $rootScope.$digest();
+
+        // then
+        expect(status.$loaded).not.toBe(true);
+
+        // but when
+        // update 'a' -> new now,
+        // does not affect b, as it resolves with old a
+        $data.set('a', 'X');
+
+        // resolve deferredB
+        deferredB.resolve('B');
+
+        $rootScope.$digest();
+
+        // then
+        expect(status.$loaded).toBe(true);
+        expect(a).toEqual('X');
+        expect(b).toEqual('A-B');
+        expect(c).toEqual('X-A-B-C');
+      }));
+    });
   });
 
-  describe('provider', function() {
+  describe('internal', function() {
 
     var __dataFactory;
 
@@ -273,10 +329,6 @@ describe('dataDepend', function() {
         providers = {};
       }
 
-      function toArray(arrayLike) {
-        return Array.prototype.slice.apply(arrayLike);
-      }
-      
       return function createProvider(options) {
 
         options = angular.extend(options, { registry: providers });
@@ -294,10 +346,6 @@ describe('dataDepend', function() {
 
         return provider;
       };
-    }
-
-    function spyOnFunction(fn) {
-      return jasmine.createSpy().andCallFake(fn);
     }
 
     it('should resolve data using promise', inject(function($rootScope) {
@@ -633,77 +681,82 @@ describe('dataDepend', function() {
       expect(cFactory.calls.length).toBe(2);
     }));
 
-    it('should not call unused data factories', inject(function($rootScope) {
+    describe('optimizations', function() {
+      it('should not produce unused data', inject(function($rootScope) {
 
-      var createProvider = createProviderFactory();
+        var createProvider = createProviderFactory();
 
-      var aProvider = createProvider({
-        produces: 'a', 
-        value: 'A'
-      });
+        var aProvider = createProvider({
+          produces: 'a', 
+          value: 'A'
+        });
 
-      var b1Factory = spyOnFunction(function (a) {
-        return a + '-B1';
-      });
-      
-      var b1Provider = createProvider({
-        produces: 'b1',
-        dependencies: [ 'a' ], 
-        eager: true,
-        factory: b1Factory
-      });
+        var b1Factory = spyOnFunction(function (a) {
+          return a + '-B1';
+        });
+        
+        var b1Provider = createProvider({
+          produces: 'b1',
+          dependencies: [ 'a' ], 
+          eager: true,
+          factory: b1Factory
+        });
 
-      var b2Factory = spyOnFunction(function (a) {
-        return a + '-B2';
-      });
+        var b2Factory = spyOnFunction(function (a) {
+          return a + '-B2';
+        });
 
-      var b2Provider = createProvider({
-        produces: 'b2', 
-        dependencies: [ 'a' ],
-        factory: b2Factory
-      });
+        var b2Provider = createProvider({
+          produces: 'b2', 
+          dependencies: [ 'a' ],
+          factory: b2Factory
+        });
 
-      // when (1)
-      $rootScope.$digest();
+        // when (1)
+        $rootScope.$digest();
 
-      // then
-      // validate results
-      expect(b1Provider.get()).toBe('A-B1');
-      expect(b2Provider.get()).not.toBeDefined();
+        // then
+        // validate results
+        expect(b1Provider.get()).toBe('A-B1');
+        expect(b2Provider.get()).not.toBeDefined();
 
-      // validate calls
-      expect(b1Factory.calls.length).toBe(1);
-      expect(b2Factory.calls.length).toBe(0);
+        // validate calls
+        expect(b1Factory.calls.length).toBe(1);
+        expect(b2Factory.calls.length).toBe(0);
 
-      // when (2)
-      aProvider.set('XX');
+        // when (2)
+        aProvider.set('XX');
 
-      $rootScope.$digest();
+        $rootScope.$digest();
 
-      // then
-      // validate results
-      expect(b1Provider.get()).toBe('XX-B1');
-      expect(b2Provider.get()).not.toBeDefined();
+        // then
+        // validate results
+        expect(b1Provider.get()).toBe('XX-B1');
+        expect(b2Provider.get()).not.toBeDefined();
 
-      // validate calls
-      expect(b1Factory.calls.length).toBe(2);
-      expect(b2Factory.calls.length).toBe(0);
-    }));
-   
-    it('should throw error when setting value on factory defined provider', inject(function($rootScope) {
+        // validate calls
+        expect(b1Factory.calls.length).toBe(2);
+        expect(b2Factory.calls.length).toBe(0);
+      }));
+    });
 
-      var createProvider = createProviderFactory();
-      
-      var fooProvider = createProvider({
-        produces: 'foo',
-        factory: function (a) {
-          return 'FOO';
-        }
-      });
+    describe('error handling', function() {
 
-      expect(function() {
-        fooProvider.set('BAR');
-      }).toThrow
-    }));
+      it('should raise error when setting value on factory-based provider', inject(function($rootScope) {
+
+        var createProvider = createProviderFactory();
+        
+        var fooProvider = createProvider({
+          produces: 'foo',
+          factory: function (a) {
+            return 'FOO';
+          }
+        });
+
+        expect(function() {
+          fooProvider.set('BAR');
+        }).toThrow
+      }));
+    }); 
   });
 });
