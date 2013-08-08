@@ -415,8 +415,8 @@
           var providers = createProviders(inheritedProvides);
 
           /**
-           * Registers a getter on the data object that gets called whenever any of the
-           * required variables change. 
+           * Registers an observer on the data object that gets called whenever 
+           * any of the required observed variables change. 
            *
            * @param {String|Array<String>} variables single variable or list of 
            *                                         variables the callback depends on
@@ -436,9 +436,9 @@
            * Example: 
            *
            *      var data = dataDepend.create($scope);
-           *      data.set('a', 'A');
+           *      data.provide('a', 'A');
            *      
-           *      var status = data.get('a', function(a) {
+           *      var status = data.observe('a', function(a) {
            *        console.log('a is ' + a);
            *      });
            *  
@@ -451,7 +451,7 @@
            *      > a is A
            *      > a is B
            */
-          function get(variables, callback) {
+          function observe(variables, callback) {
 
             var name = 'provider$' + nextId();
             
@@ -525,8 +525,8 @@
             var oldValueName = name + ':old';
 
             // create provider
-            set(name, scope.$eval(expression));
-            set(oldValueName, null);
+            provide(name, scope.$eval(expression));
+            provide(oldValueName, null);
 
             var provider = providers.get(name);
             var oldValueProvider = providers.get(oldValueName);
@@ -544,19 +544,20 @@
           }
 
           /**
-           * Set variable to the given value
+           * Provide one ore more variables under well known names.
            * 
-           * @param {string} name of the variable
-           * @param {function | object | array } value the value to initialize the object with
+           * @param {String|Array<String>} name of the variable(s)
+           * @param {Function | Object | Array } value the value to initialize the object with
+           *
+           * @return {Object} handle to the newly created providers data
            */
-          function set(name, value) {
-            var provider = providers.get(name),
-                factory, 
-                variables;
+          function provide(name, value) {
+            var factory, 
+                variables,
+                provider;
 
-            if (provider) {
-              provider.set(value);
-              return provider.data;
+            if (providers.get(name)) {
+              throw new Error('[dataDepend] provider with name ' + name + ' already registered');
             }
 
             if (isFunction(value) || isArray(value)) {
@@ -571,7 +572,7 @@
               }
             }
 
-            var provider = internalCreateProvider({
+            provider = internalCreateProvider({
               produces: name, 
               factory: factory,
               value: value,
@@ -582,6 +583,27 @@
             // return handle to the
             // providers data
             return provider.data;
+          }
+
+          /**
+           * Set a provided variable to the given value
+           * 
+           * @param {string} name of the variable
+           * @param {function | object | array } value the value to initialize the object with
+           */
+          function set(name, value) {
+
+            if (typeof name !== 'string') {
+              throw new Error("[dataDepend] expected name to be a string, got " + name);
+            }
+
+            var provider = providers.get(name);
+
+            if (!provider) {
+              throw new Error("[dataDepend] no provider with name " + name);
+            }
+
+            provider.set(value);
           }
 
           function changed(name) {
@@ -602,7 +624,7 @@
             });
           }
 
-          function child(scope) {
+          function createChild(scope) {
             return createDataDepend(scope, providers);
           }
 
@@ -611,11 +633,12 @@
           return {
             $providers: providers, 
 
-            get: get,
+            observe: observe,
+            provide: provide,
             set: set,
             changed: changed,
             watchScope: watchScope,
-            child: child
+            newChild: createChild
           };
         }
 

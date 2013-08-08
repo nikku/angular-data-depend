@@ -21,18 +21,17 @@ describe('dataDepend', function() {
 
   describe('basic usage', function() {
 
-
     it('should resolve simple data', inject(function() {
 
       // given
       var foo;
 
-      $data.set('foo', function() {
+      $data.provide('foo', function() {
         return 'FOO';
       });
 
       // when
-      var status = $data.get('foo', function(_foo) {
+      var status = $data.observe('foo', function(_foo) {
         foo = _foo;
       });
 
@@ -47,21 +46,21 @@ describe('dataDepend', function() {
       expect(status.$loaded).toBe(true);
     }));
 
-    it('should resolve simple data', inject(function() {
+    it('should resolve simple data (multiple)', inject(function() {
 
       // given
       var foo, bar;
 
       // when
-      $data.set([ 'foo', 'bar' ], function() {
+      $data.provide([ 'foo', 'bar' ], function() {
         return [ 'FOO', 'BAR' ];
       });
 
-      var $foo = $data.get('foo', function(_foo) {
+      var $foo = $data.observe('foo', function(_foo) {
         foo = _foo;
       });
 
-      var $bar = $data.get('bar', function(_bar) {
+      var $bar = $data.observe('bar', function(_bar) {
         bar = _bar;
       });
 
@@ -86,12 +85,12 @@ describe('dataDepend', function() {
       var deferred = $q.defer(),
           foo;
 
-      $data.set('foo', function() {
+      $data.provide('foo', function() {
         return deferred.promise;
       });
 
       // when
-      var status = $data.get('foo', function(_foo) {
+      var status = $data.observe('foo', function(_foo) {
         foo = _foo;
       });
 
@@ -115,12 +114,12 @@ describe('dataDepend', function() {
       var globalFoo = 'FOO',
           foo;
 
-      $data.set('foo', function() {
+      $data.provide('foo', function() {
         return globalFoo;
       });
 
       // when
-      var status = $data.get('foo', function(_foo) {
+      var status = $data.observe('foo', function(_foo) {
         foo = _foo;
       });
 
@@ -147,14 +146,14 @@ describe('dataDepend', function() {
       // given
       var foo;
 
-      $data.set('bar', 'BAR');
+      $data.provide('bar', 'BAR');
 
-      $data.set('foo', [ 'bar', function(bar) {
+      $data.provide('foo', [ 'bar', function(bar) {
         return bar;
       }]);
 
       // when
-      var status = $data.get('foo', function(_foo) {
+      var status = $data.observe('foo', function(_foo) {
         foo = _foo;
       });
 
@@ -185,7 +184,7 @@ describe('dataDepend', function() {
       $data.watchScope('fooBar', 'foo.bar');
       $data.watchScope('foo');
 
-      var status = $data.get([ 'foo', 'bar', 'fooBar' ], function(_foo, _bar, _fooBar) {
+      var status = $data.observe([ 'foo', 'bar', 'fooBar' ], function(_foo, _bar, _fooBar) {
         foo = _foo;
         bar = _bar;
         fooBar = _fooBar;
@@ -231,7 +230,7 @@ describe('dataDepend', function() {
       $data.watchScope('bar', 'bar');
       $data.watchScope('foo');
 
-      var status = $data.get([ 'foo', 'foo:old', 'bar', 'bar:old'], function(_foo, _fooOld, _bar, _barOld) {
+      var status = $data.observe([ 'foo', 'foo:old', 'bar', 'bar:old'], function(_foo, _fooOld, _bar, _barOld) {
         foo = _foo;
         fooOld = _fooOld;
         bar = _bar;
@@ -273,13 +272,13 @@ describe('dataDepend', function() {
       // given
       var deferred, value;
 
-      var $producer = $data.set('a', function() {
+      var $producer = $data.provide('a', function() {
         deferred = $q.defer();
 
         return deferred.promise;
       });
 
-      var $value = $data.get('a', function(a) {
+      var $value = $data.observe('a', function(a) {
         value = a;
       });
 
@@ -307,22 +306,22 @@ describe('dataDepend', function() {
         return [ 'A', 'B' ];
       });
 
-      var $ab = $data.set([ 'a', 'b' ], abFactory);
+      var $ab = $data.provide([ 'a', 'b' ], abFactory);
 
-      var $c = $data.set('c', [ 'a', function(a) {
+      var $c = $data.provide('c', [ 'a', function(a) {
         return a + '-C';
       }]);
 
-      var $d = $data.set('d', [ 'b', function(b) {
+      var $d = $data.provide('d', [ 'b', function(b) {
         return b + '-D';
       }]);
 
-      var $e = $data.set('e', [ 'a', 'b', function(a, b) {
+      var $e = $data.provide('e', [ 'a', 'b', function(a, b) {
         return a + '-' + b + '-E';
       }]);
 
       // when
-      var $all = $data.get([ 'a', 'b', 'c', 'd', 'e'], function(_a, _b, _c, _d, _e) {
+      var $all = $data.observe([ 'a', 'b', 'c', 'd', 'e'], function(_a, _b, _c, _d, _e) {
         a = _a, b = _b, c = _c, d = _d, e = _e;
       });
 
@@ -343,28 +342,28 @@ describe('dataDepend', function() {
       // given
       var a1, a2, b, c1, c2;
 
-      var $a1 = $data.set('a1', 'A1');
-      var $a2 = $data.set('a2', 'A2');
+      var $a1 = $data.provide('a1', 'A1');
+      var $a2 = $data.provide('a2', 'A2');
 
       var bFactory = spyOnFunction(function (a1, a2) {
         return a1 + '-' + a2;
       });
 
-      var $b = $data.set('b', [ 'a1', 'a2', bFactory ]);
+      var $b = $data.provide('b', [ 'a1', 'a2', bFactory ]);
 
       var c1Factory = spyOnFunction(function (b) {
         return b + '-' + 'C1';
       });
 
-      var $c1 = $data.set('c1', [ 'b', c1Factory ]);
+      var $c1 = $data.provide('c1', [ 'b', c1Factory ]);
 
       var c2Factory = spyOnFunction(function (b) {
         return b + '-' + 'C2';
       });
 
-      var $c2 = $data.set('c2', [ 'b', c2Factory ]);
+      var $c2 = $data.provide('c2', [ 'b', c2Factory ]);
 
-      var $all = $data.get([ 'a1', 'a2', 'b', 'c1', 'c2' ], function(_a1, _a2, _b, _c1, _c2) {
+      var $all = $data.observe([ 'a1', 'a2', 'b', 'c1', 'c2' ], function(_a1, _a2, _b, _c1, _c2) {
         a1 = _a1, a2 = _a2, b = _b, c1 = _c1, c2 = _c2;
       });
 
@@ -401,27 +400,27 @@ describe('dataDepend', function() {
       // given
       var a, b1, b2, c;
 
-      var $a = $data.set('a', 'A');
+      var $a = $data.provide('a', 'A');
 
       var b1Factory = spyOnFunction(function (a) {
         return a + '-B1';
       });
 
-      var $b1 = $data.set('b1', [ 'a', b1Factory ]);
+      var $b1 = $data.provide('b1', [ 'a', b1Factory ]);
 
       var b2Factory = spyOnFunction(function (a) {
         return a + '-B2';
       });
 
-      var $b2 = $data.set('b2', [ 'a', b2Factory ]);
+      var $b2 = $data.provide('b2', [ 'a', b2Factory ]);
 
       var cFactory = spyOnFunction(function (b1, b2) {
         return b1 + '-' + b2;
       });
 
-      var $c = $data.set('c', [ 'b1', 'b2', cFactory ]);
+      var $c = $data.provide('c', [ 'b1', 'b2', cFactory ]);
 
-      var $all = $data.get([ 'a', 'b1', 'b2', 'c' ], function(_a, _b1, _b2, _c) {
+      var $all = $data.observe([ 'a', 'b1', 'b2', 'c' ], function(_a, _b1, _b2, _c) {
         a = _a, b1 = _b1, b2 = _b2, c = _c;
       });
 
@@ -462,19 +461,19 @@ describe('dataDepend', function() {
             a, b, c;
 
         // when
-        $data.set('a', 'A');
+        $data.provide('a', 'A');
 
-        $data.set('b', [ 'a', function(a) {
+        $data.provide('b', [ 'a', function(a) {
           return deferredB.promise.then(function(b) {
             return a + '-' + b;
           });
         }]);
 
-        $data.set('c', [ 'a', 'b', function(a, b) {
+        $data.provide('c', [ 'a', 'b', function(a, b) {
           return a + '-' + b + '-C';
         }]);
 
-        var status = $data.get([ 'a', 'b', 'c' ], function(_a, _b, _c) {
+        var status = $data.observe([ 'a', 'b', 'c' ], function(_a, _b, _c) {
           a = _a;
           b = _b;
           c = _c;
@@ -515,11 +514,11 @@ describe('dataDepend', function() {
       var a;
 
       // when
-      $data.set('a', 'A');
+      $data.provide('a', 'A');
 
-      var $childData = $data.child(childScope);
+      var $childData = $data.newChild(childScope);
 
-      var $a = $childData.get('a', function(_a) {
+      var $a = $childData.observe('a', function(_a) {
         a = _a;
       });
 
@@ -543,22 +542,22 @@ describe('dataDepend', function() {
       var childScope = $rootScope.$new(false);
       var nestedChildScope = childScope.$new(false);
 
-      var $childData = $data.child(childScope);
-      var $nestedChildData = $childData.child(nestedChildScope);
+      var $childData = $data.newChild(childScope);
+      var $nestedChildData = $childData.newChild(nestedChildScope);
 
       var abc;
 
-      $data.set('a', 'A');
+      $data.provide('a', 'A');
 
       // when
 
-      $childData.set('b', 'B');
+      $childData.provide('b', 'B');
 
-      $childData.set('c', [ 'a', function(a) {
+      $childData.provide('c', [ 'a', function(a) {
         return a + '-C';
       }]);
 
-      $nestedChildData.get(['a', 'b', 'c'], function(_a, _b, _c) {
+      $nestedChildData.observe(['a', 'b', 'c'], function(_a, _b, _c) {
         abc = _a + _b + _c;
       });
 
@@ -576,11 +575,11 @@ describe('dataDepend', function() {
       var a;
 
       // when
-      var $childData = $data.child(childScope);
+      var $childData = $data.newChild(childScope);
 
-      $childData.set('a', 'A');
+      $childData.provide('a', 'A');
 
-      $childData.get('a', function(_a) {
+      $childData.observe('a', function(_a) {
         a = _a;
       });
 
@@ -590,7 +589,7 @@ describe('dataDepend', function() {
       expect(a).toBe('A');
 
       expect(function() {
-        $data.get('a', function(a) { });
+        $data.observe('a', function(a) { });
       }).toThrow;
     }));
 
@@ -601,13 +600,13 @@ describe('dataDepend', function() {
 
       var abc;
 
-      $data.set('a', 'A');
+      $data.provide('a', 'A');
 
-      var $childData = $data.child(childScope);
+      var $childData = $data.newChild(childScope);
 
-      $childData.set('b', 'B');
+      $childData.provide('b', 'B');
 
-      $childData.set('c', [ 'a', function(a) {
+      $childData.provide('c', [ 'a', function(a) {
         return a + '-C';
       }]);
 
@@ -615,7 +614,7 @@ describe('dataDepend', function() {
         abc = _a + _b + _c;
       });
 
-      $childData.get(['a', 'b', 'c'], callback);
+      $childData.observe(['a', 'b', 'c'], callback);
 
       tick();
 
@@ -646,14 +645,14 @@ describe('dataDepend', function() {
 
       var abc;
 
-      $data.set('a', 'A');
+      $data.provide('a', 'A');
 
-      var $childData = $data.child(childScope);
-      var $nestedChildData = $childData.child(nestedChildScope);
+      var $childData = $data.newChild(childScope);
+      var $nestedChildData = $childData.newChild(nestedChildScope);
 
-      $childData.set('b', 'B');
+      $childData.provide('b', 'B');
 
-      $childData.set('c', [ 'a', function(a) {
+      $childData.provide('c', [ 'a', function(a) {
         return a + '-C';
       }]);
 
@@ -661,7 +660,7 @@ describe('dataDepend', function() {
         abc = _a + _b + _c;
       });
 
-      $nestedChildData.get(['a', 'b', 'c'], callback);
+      $nestedChildData.observe(['a', 'b', 'c'], callback);
 
       tick();
 
@@ -692,19 +691,19 @@ describe('dataDepend', function() {
       // given
       var value;
 
-      var $a = $data.set('a', 'A');
+      var $a = $data.provide('a', 'A');
 
       var valueCallback = spyOnFunction(function(a) {
         value = a;
       });
       
-      $data.get('a', valueCallback);
+      $data.observe('a', valueCallback);
 
       var unusedFactory = spyOnFunction(function (a) {
         return a;
       });
 
-      $data.set('unused', [ 'a' , unusedFactory ]);
+      $data.provide('unused', [ 'a' , unusedFactory ]);
 
       // when
       tick();
@@ -731,7 +730,7 @@ describe('dataDepend', function() {
     it('should raise error when setting value on factory-based provider', inject(function() {
 
       // given
-      $data.set('factory', function() {
+      $data.provide('factory', function() {
         return -1;
       });
 
@@ -744,7 +743,7 @@ describe('dataDepend', function() {
     it('should raise error when setting factory on value-based provider', inject(function() {
 
       // given
-      $data.set('value', 'some-fixed-value');
+      $data.provide('value', 'some-fixed-value');
 
       // when -> then
       expect(function() {
