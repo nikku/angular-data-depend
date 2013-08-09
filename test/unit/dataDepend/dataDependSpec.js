@@ -593,6 +593,41 @@ describe('dataDepend', function() {
       }).toThrow;
     }));
 
+    it('should propagate #set to correct parent scope', inject(function($rootScope, dataDepend) {
+
+      // given
+      var childScope = $rootScope.$new(false);
+      var aChild, aRoot;
+
+      $data.provide('a', 'A');
+
+      // when
+      var $childData = $data.newChild(childScope);
+
+      $childData.observe('a', function(_a) {
+        aChild = _a;
+      });
+
+      $data.observe('a', function(_a) {
+        aRoot = _a;
+      });
+
+      tick();
+
+      // then
+      expect(aChild).toBe('A');
+      expect(aRoot).toBe('A');
+
+      // when
+      // changing a from child ...
+      $childData.set('a', 'B');
+      tick();
+
+      // then
+      expect(aChild).toBe('B');
+      expect(aRoot).toBe('B');
+    }));
+
     it('should cleanup child data on scope $destroy', inject(function($rootScope, dataDepend) {
 
       // given
