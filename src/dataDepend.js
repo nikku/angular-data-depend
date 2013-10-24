@@ -4,10 +4,10 @@
  * See https://github.com/Nikku/angular-data-depend for details.
  *
  * @version 1.0.0
- *
+ * 
  * @author Nico Rehwaldt <http://github.com/Nikku>
  * @author Roman Smirnov <https://github.com/romansmirnov>
- *
+ * 
  * @license (c) 2013 Nico Rehwaldt, MIT
  */
 
@@ -17,7 +17,7 @@
 
     var module = angular.module('dataDepend', []);
 
-    var isArray = angular.isArray, 
+    var isArray = angular.isArray,
         isFunction = angular.isFunction,
         isObject = angular.isObject,
         forEach = angular.forEach,
@@ -63,7 +63,7 @@
           }
 
           return {
-            local: providers, 
+            local: providers,
             get: get,
             put: put
           };
@@ -89,7 +89,7 @@
           var produces = options.produces,
               registry = options.registry,
               dependencies = options.dependencies || [],
-              factory = options.factory, 
+              factory = options.factory,
               eager = options.eager || false;
 
           var parentValues = {},
@@ -104,7 +104,7 @@
           var provider = {
             produces: produces,
             data: data,
-            get: get, 
+            get: get,
             set: set,
             resolve: resolve,
             children: children,
@@ -134,6 +134,8 @@
             var oldValue = data.value;
 
             data.$loaded = true;
+            delete data.$error;
+
             changed = false;
 
             if (oldValue !== newValue) {
@@ -206,6 +208,8 @@
               var promise = provider.resolve().then(function(value) {
                 logValue(d, value);
                 return value;
+              }, function(error) {
+                throw new Error('<' + d + '> <- ' + error.message);
               });
 
               promises.push(promise);
@@ -221,7 +225,6 @@
                 var v = getProvider(d).get();
 
                 logValue(d, v);
-
                 values.push(v);
               });
 
@@ -252,7 +255,11 @@
                 // or no dependencies are given)
                 if (changed || reload || values.length == 0) {
                   log('asyncLoad: call factory');
-                  value = factory.apply(factory, values);
+                  try {
+                    value = factory.apply(factory, values);
+                  } catch (e) {
+                    throw new Error('unresolvable: ' + e.message);
+                  }
                 }
               }
 
@@ -269,6 +276,20 @@
               loading = null;
               setLoaded(value);
               return value;
+            }, function(error) {
+
+              if (loading !== promise) {
+                log('asyncLoad: skip (new load request)');
+                return loading;
+              }
+
+              log('asyncLoad: load error');
+
+              loading = null;
+              data.$error = error;
+              changed = false;
+
+              throw error;
             });
 
             return promise;
@@ -332,7 +353,9 @@
 
           function set(value) {
             if (factory) {
-              throw new Error("[dataDepend] Cannot set value, was using factory");
+              throw new Error('[dataDepend] Cannot set value, was using factory');
+            } else if (isFunction(value)) {
+              throw new Error('[dataDepend] Cannot refine static value using factory function');
             }
 
             setLoaded(value);
@@ -387,7 +410,7 @@
               return filter(__get.apply(null, args));
             }
 
-            var filteredProvider = angular.extend({}, provider, { 
+            var filteredProvider = angular.extend({}, provider, {
               resolve: resolve,
               get: get
             });
@@ -407,8 +430,16 @@
             });
           }
 
+          var handleApi = {
+            reload: function() {
+              resolve({ reload: true});
+            }
+          };
+
+          angular.extend(data, handleApi);
+          
           return provider;
-        };
+        }
 
         function createDataDepend(scope, inheritedProvides) {
 
@@ -475,9 +506,9 @@
             }
 
             var provider = internalCreateProvider({
-              produces: name, 
-              factory: callback, 
-              dependencies: variables, 
+              produces: name,
+              factory: callback,
+              dependencies: variables,
               eager: true,
               registry: providers
             });
@@ -492,7 +523,7 @@
                 provider;
 
             if (!produces) {
-              throw new Error("[dataDepend] Must provide produces when creating new provider");
+              throw new Error('[dataDepend] Must provide produces when creating new provider');
             }
 
             provider = createProvider(options);
@@ -552,12 +583,12 @@
            * @return {Object} handle to the newly created providers data
            */
           function provide(name, value) {
-            var factory, 
+            var factory,
                 variables,
                 provider;
 
             if (providers.get(name)) {
-              throw new Error('[dataDepend] provider with name ' + name + ' already registered');
+              throw new Error('[dataDepend] provider for ' + name + ' already registered');
             }
 
             if (isFunction(value) || isArray(value)) {
@@ -573,10 +604,10 @@
             }
 
             provider = internalCreateProvider({
-              produces: name, 
+              produces: name,
               factory: factory,
               value: value,
-              dependencies: variables, 
+              dependencies: variables,
               registry: providers
             });
 
@@ -594,13 +625,13 @@
           function set(name, value) {
 
             if (typeof name !== 'string') {
-              throw new Error("[dataDepend] expected name to be a string, got " + name);
+              throw new Error('[dataDepend] expected name to be a string, got ' + name);
             }
 
             var provider = providers.get(name);
 
             if (!provider) {
-              throw new Error("[dataDepend] no provider with name " + name);
+              throw new Error('[dataDepend] no provider with name ' + name);
             }
 
             provider.set(value);
@@ -631,8 +662,7 @@
           scope.$on('$destroy', destroy);
 
           return {
-            $providers: providers, 
-
+            $providers: providers,
             observe: observe,
             provide: provide,
             set: set,
@@ -657,14 +687,14 @@
     return module;
   }
 
-  if (typeof define === "function" && define.amd) {
-    define([ "angular" ], function(angular) {
+  if (typeof define === 'function' && define.amd) {
+    define([ 'angular' ], function(angular) {
       return createBinding(angular);
     });
   } else
   if (typeof angular !== undefined) {
     createBinding(angular);
   } else {
-    throw new Error("Cannot bind dataDepend: AngularJS not available on window or via AMD");
+    throw new Error('[dataDepend] Failed to bind: AngularJS not available on window or via AMD');
   }
 })(angular);

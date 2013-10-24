@@ -1,6 +1,8 @@
 describe('dataDepend', function() {
 
-  beforeEach(module('dataDepend'));
+  beforeEach(module('dataDepend', function($exceptionHandlerProvider) {
+    $exceptionHandlerProvider.mode('log');
+  }));
 
   var $data;
 
@@ -590,7 +592,7 @@ describe('dataDepend', function() {
 
       expect(function() {
         $data.observe('a', function(a) { });
-      }).toThrow;
+      }).toThrow();
     }));
 
     it('should propagate #set to correct parent scope', inject(function($rootScope, dataDepend) {
@@ -760,7 +762,157 @@ describe('dataDepend', function() {
     }));
   });
 
-  describe('error handling', function() {
+  describe('error propagation', function() {
+
+    it('should update status on load error', function() {
+
+      var a;
+
+      // given
+      $data.provide('a', function() {
+        throw new Error("not available");
+      });
+
+      // when
+      var status = $data.observe(['a', function(_a) {
+        a = _a;
+      }]);
+
+      tick();
+
+      // then
+      expect(a).not.toBeDefined();
+
+      expect(!!status.$loaded).toBe(false);
+      expect(status.$error).toBeDefined();
+
+      expect(status.$error.toString()).toEqual("Error: <a> <- unresolvable: not available");
+    });
+
+    it('should update dependent status on load error', function() {
+
+      var d;
+
+      // given
+      $data.provide('a', function() {
+        throw new Error("not available");
+      });
+
+      $data.provide('b', ['a', function(_a) {
+        return _a + '-B';
+      }]);
+
+      $data.provide('c', function() {
+        return 'C';
+      });
+
+      $data.provide('d', [ 'b', 'c', function(_b, _c) {
+        return _b + _c;
+      }]);
+
+      // when
+      var status = $data.observe(['d', function(_d) {
+        d = _d;
+      }]);
+
+      tick();
+
+      // then
+      expect(d).not.toBeDefined();
+      expect(status.$error).toBeDefined();
+
+      expect(status.$error.toString()).toEqual("Error: <d> <- <b> <- <a> <- unresolvable: not available");
+    });
+
+    it('should reload successfully after load error', function() {
+
+      var unavailable = true;
+      var a;
+
+      // given
+      $data.provide('a', function() {
+        if (unavailable) {
+          throw new Error("not available");
+        } else {
+          return 'A';
+        }
+      });
+
+      // when
+      var status = $data.observe(['a', function(_a) {
+        a = _a;
+      }]);
+
+      tick();
+
+      // then
+      expect(a).not.toBeDefined();
+
+      expect(!!status.$loaded).toBe(false);
+      expect(status.$error).toBeDefined();
+
+      expect(status.$error.toString()).toEqual("Error: <a> <- unresolvable: not available");
+
+      // but when
+      
+      unavailable = false;
+      status.reload();
+
+      tick();
+
+      expect(status.$loaded).toBe(true);
+      expect(status.$error).not.toBeDefined();
+    });
+
+    it('should reload nested successfully after load error', function() {
+
+      var unavailable = true;
+      var d;
+
+      // given
+      $data.provide('a', function() {
+        if (unavailable) {
+          throw new Error("not available");
+        } else {
+          return 'A';
+        }
+      });
+
+      $data.provide('b', ['a', function(_a) {
+        return _a + '-B';
+      }]);
+
+      $data.provide('c', function() {
+        return 'C';
+      });
+
+      $data.provide('d', [ 'b', 'c', function(_b, _c) {
+        return _b + _c;
+      }]);
+
+      // when
+      var status = $data.observe(['d', function(_d) {
+        d = _d;
+      }]);
+
+      tick();
+
+      // then
+      expect(d).not.toBeDefined();
+      expect(status.$error).toBeDefined();
+
+      // but when
+      unavailable = false;
+      status.reload();
+
+      tick();
+
+      expect(status.$loaded).toBe(true);
+      expect(status.$error).not.toBeDefined();
+    });
+  });
+
+  describe('assertions', function() {
 
     it('should raise error when setting value on factory-based provider', inject(function() {
 
@@ -772,7 +924,7 @@ describe('dataDepend', function() {
       // when -> then
       expect(function() {
         $data.set('factory', 'some-fixed-value');
-      }).toThrow
+      }).toThrow();
     }));
 
     it('should raise error when setting factory on value-based provider', inject(function() {
@@ -785,7 +937,7 @@ describe('dataDepend', function() {
         $data.set('value', function() {
           return 'produced';
         });
-      }).toThrow
+      }).toThrow();
     }));
   });
 });
