@@ -591,7 +591,7 @@
               throw new Error('[dataDepend] provider for ' + name + ' already registered');
             }
 
-            if (isFunction(value) || isArray(value)) {
+            if (isFunction(value) || (isArray(value) && isFunction(value[value.length - 1]))) {
               // parse factory and variables from 
               // [ 'A', 'B', function(A, B) { ... }] notation 
               factory = value;
