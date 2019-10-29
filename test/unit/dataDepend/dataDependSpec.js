@@ -81,6 +81,29 @@ describe('dataDepend', function() {
       expect($bar.$loaded).toBe(true);
     }));
 
+    it('should resolve simple data (arrays)', inject(function() {
+      // given
+      var foo;
+      var bar = ['bar'];
+
+      $data.provide('foo', bar);
+
+      // when
+      var status = $data.observe('foo', function(_foo) {
+        foo = _foo;
+      });
+
+      // then
+      expect(status.$loaded).not.toBe(true);
+
+      // but after
+      tick();
+
+      // then
+      expect(foo).toBe(bar);
+      expect(status.$loaded).toBe(true);
+    }));
+
     it('should resolve deferred data', inject(function($q) {
 
       // given
